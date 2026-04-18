@@ -4,7 +4,6 @@ const db = require('../db');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // POST /api/vocab/import
 router.post('/import', (req, res) => {
@@ -143,10 +142,12 @@ router.post('/generate-quiz', async (req, res) => {
     try {
         const { word, meaning, example } = req.body;
 
-        if (!process.env.GEMINI_API_KEY) {
-            return res.status(500).json({ success: false, error: 'Gemini API keys are not configured' });
+        const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ success: false, error: 'Gemini API key is not configured' });
         }
 
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const prompt = `
 Given this English word: "${word}", its meaning: "${meaning}", and example sentence: "${example}"

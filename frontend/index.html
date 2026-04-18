@@ -292,6 +292,7 @@
         <div class="nav-item active" onclick="switchModule('dashboard')"><span class="nav-icon">🏠</span><span>Tổng quan</span></div>
         <div class="nav-item" onclick="switchModule('speaking')"><span class="nav-icon">🎙️</span><span>Luyện Nói</span></div>
         <div class="nav-item" onclick="switchModule('vocabulary')"><span class="nav-icon">📚</span><span>Từ Vựng</span></div>
+        <div class="nav-item" style="margin-top: auto;" onclick="switchModule('settings')"><span class="nav-icon">⚙️</span><span>Cài đặt</span></div>
     </nav>
 
     <!-- Main Content -->
@@ -497,6 +498,23 @@
             </div>
 
         </div>
+
+        <!-- SETTINGS MODULE -->
+        <div id="module-settings" class="module">
+            <h1 style="margin-bottom: 24px;">Cài đặt hệ thống</h1>
+            <div class="card" style="max-width: 600px;">
+                <h3>Cấu hình API Key (Gemini)</h3>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
+                    Nhập Gemini API Key cá nhân của bạn để dùng tính năng luyện nói và tạo bài tập bằng AI. 
+                    Nếu để trống, hệ thống sẽ sử dụng key mặc định của Server.
+                </p>
+                <div class="form-group">
+                    <input type="password" id="geminiApiKeyInput" class="form-control" placeholder="Bắt đầu bằng AIzaSy...">
+                </div>
+                <button class="btn" onclick="saveApiKey()">Lưu cài đặt</button>
+            </div>
+        </div>
+
     </main>
 
     <!-- Session Summary Modal -->
@@ -516,6 +534,7 @@
         let state = {
             userId: localStorage.getItem('userId'),
             userName: localStorage.getItem('userName'),
+            geminiApiKey: localStorage.getItem('geminiApiKey') || '',
             currentSessionId: null,
             myVocabs: [],
             fcIndex: 0
@@ -544,6 +563,9 @@
         async function api(endpoint, method = 'GET', body = null) {
             try {
                 const options = { method, headers: {} };
+                if (state.geminiApiKey) {
+                    options.headers['x-gemini-api-key'] = state.geminiApiKey;
+                }
                 if (body) {
                     options.headers['Content-Type'] = 'application/json';
                     options.body = JSON.stringify(body);
@@ -581,6 +603,16 @@
 
             if (id === 'dashboard') loadDashboard();
             if (id === 'vocabulary') loadVocabData();
+            if (id === 'settings') {
+                document.getElementById('geminiApiKeyInput').value = state.geminiApiKey;
+            }
+        }
+        
+        function saveApiKey() {
+            const key = document.getElementById('geminiApiKeyInput').value.trim();
+            localStorage.setItem('geminiApiKey', key);
+            state.geminiApiKey = key;
+            showToast('Đã lưu API Key thành công!');
         }
 
         function playTTS(text) {

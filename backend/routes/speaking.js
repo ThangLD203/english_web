@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
 
 // POST /api/speaking/analyze
 router.post('/analyze', async (req, res) => {
@@ -14,10 +14,12 @@ router.post('/analyze', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Transcript is required' });
         }
 
-        if (!process.env.GEMINI_API_KEY) {
-            return res.status(500).json({ success: false, error: 'Gemini API keys are not configured' });
+        const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ success: false, error: 'Gemini API key is not configured' });
         }
 
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const prompt = `
 You are an expert English speaking coach for Vietnamese learners.
