@@ -396,9 +396,10 @@
 
             <div id="vocab-import" class="vocab-view">
                 <div class="card" style="margin-bottom: 20px;">
-                    <h3>Đồng bộ từ máy chủ (Server)</h3>
-                    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">Tự động quét file vocab.txt gắn với server và nạp thêm các từ bạn chưa có.</p>
-                    <button class="btn btn-outline" id="btnSyncServer" onclick="loadServerVocab()">🔄 Đồng bộ từ vocab.txt</button>
+                    <h3>Nhập từ vựng từ tệp (.txt)</h3>
+                    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">Chọn tệp từ máy tính có định dạng chuẩn (như file vocab.txt).</p>
+                    <input type="file" id="vocabFileInput" accept=".txt" class="form-control" style="margin-bottom: 10px;">
+                    <button class="btn btn-outline" id="btnUploadFile" onclick="importFromFile()">📤 Tải lên và Nạp</button>
                 </div>
 
                 <div class="card">
@@ -787,21 +788,30 @@
             } catch(e){}
         }
 
-        async function loadServerVocab() {
-            try {
-                const btn = document.getElementById('btnSyncServer');
+        async function importFromFile() {
+            const fileInput = document.getElementById('vocabFileInput');
+            if (!fileInput.files.length) return showToast('Vui lòng chọn một tệp .txt', 'error');
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                const content = e.target.result;
+                const btn = document.getElementById('btnUploadFile');
                 btn.disabled = true;
-                btn.innerText = 'Đang quét...';
+                btn.innerText = 'Đang tải lên...';
                 
-                const res = await api('/vocab/load-server-file', 'POST', { user_id: state.userId });
-                showToast(`Đã đồng bộ thành công ${res.imported} từ mới!`);
-                loadVocabData();
-                btn.innerText = '🔄 Đồng bộ từ vocab.txt';
-                btn.disabled = false;
-            } catch(e) {
-                document.getElementById('btnSyncServer').disabled = false;
-                document.getElementById('btnSyncServer').innerText = '🔄 Đồng bộ từ vocab.txt';
-            }
+                try {
+                    const res = await api('/vocab/import-format', 'POST', { user_id: state.userId, content });
+                    showToast(`Đã nạp thành công ${res.imported} từ mới!`);
+                    loadVocabData();
+                } catch(err) {} finally {
+                    btn.disabled = false;
+                    btn.innerText = '📤 Tải lên và Nạp';
+                    fileInput.value = ''; // clear input
+                }
+            };
+            reader.readAsText(file);
         }
 
         async function loadVocabData() {

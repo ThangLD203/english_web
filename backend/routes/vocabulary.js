@@ -39,25 +39,15 @@ router.post('/import', (req, res) => {
     }
 });
 
-// POST /api/vocab/load-server-file
-router.post('/load-server-file', (req, res) => {
+// POST /api/vocab/import-format
+router.post('/import-format', (req, res) => {
     try {
-        const { user_id } = req.body;
-        // /app/vocab.txt is the mounted path inside docker
-        const filePath = '/app/vocab.txt';
-        
-        if (!fs.existsSync(filePath)) {
-            // fallback for local execution without docker
-            const localPath = require('path').join(__dirname, '../../vocab.txt');
-            if (fs.existsSync(localPath)) {
-                filePath = localPath;
-            } else {
-                return res.status(404).json({ success: false, error: 'File vocab.txt không tồn tại trên server' });
-            }
+        const { user_id, content } = req.body;
+        if (!content) {
+            return res.status(400).json({ success: false, error: 'Không có dữ liệu văn bản' });
         }
         
-        const fileData = fs.readFileSync(filePath, 'utf8');
-        const lines = fileData.split(/\r?\n/);
+        const lines = content.split(/\r?\n/);
         
         const insert = db.prepare('INSERT INTO vocabulary_words (user_id, word, meaning, example, topic) VALUES (?, ?, ?, ?, ?)');
         const checkExist = db.prepare('SELECT id FROM vocabulary_words WHERE user_id = ? AND word = ?');
