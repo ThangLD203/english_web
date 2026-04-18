@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -25,6 +26,66 @@ router.post('/import', (req, res) => {
                     if (word && meaning) {
                         insert.run(user_id, word, meaning, example, topic || 'Custom');
                         count++;
+                    }
+                }
+            }
+            return count;
+        });
+        
+        const count = insertMany(lines);
+        res.json({ success: true, data: { imported: count } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/vocab/load-server-file
+router.post('/load-server-file', (req, res) => {
+    try {
+        const { user_id } = req.body;
+        // /app/vocab.txt is the mounted path inside docker
+        const filePath = '/app/vocab.txt';
+        
+        if (!fs.existsSync(filePath)) {
+            // fallback for local execution without docker
+            const localPath = require('path').join(__dirname, '../../vocab.txt');
+            if (fs.existsSync(localPath)) {
+                filePath = localPath;
+            } else {
+                return res.status(404).json({ success: false, error: 'File vocab.txt không tồn tại trên server' });
+            }
+        }
+        
+        const fileData = fs.readFileSync(filePath, 'utf8');
+        const lines = fileData.split(/\r?\n/);
+        
+        const insert = db.prepare('INSERT INTO vocabulary_words (user_id, word, meaning, example, topic) VALUES (?, ?, ?, ?, ?)');
+        const checkExist = db.prepare('SELECT id FROM vocabulary_words WHERE user_id = ? AND word = ?');
+        
+        const insertMany = db.transaction((linesList) => {
+            let count = 0;
+            let currentTopic = 'Custom';
+            
+            for (let line of linesList) {
+                line = line.trim();
+                if (!line || line.startsWith('-----')) continue;
+                
+                if (line.startsWith('CHỦ ĐỀ:')) {
+                    currentTopic = line.replace('CHỦ ĐỀ:', '').trim();
+                    continue;
+                }
+                
+                const parts = line.split('/');
+                if (parts.length >= 2) {
+                    const word = parts[0].trim();
+                    const meaning = parts[1].trim();
+                    
+                    if (word && meaning) {
+                        const exists = checkExist.get(user_id, word);
+                        if (!exists) {
+                            insert.run(user_id, word, meaning, '', currentTopic);
+                            count++;
+                        }
                     }
                 }
             }

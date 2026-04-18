@@ -9,6 +9,7 @@ services:
       - PORT=3001
     volumes:
       - sqlite_data:/data
+      - ./vocab.txt:/app/vocab.txt
     restart: unless-stopped
 
   frontend:

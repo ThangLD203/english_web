@@ -395,8 +395,14 @@
             </div>
 
             <div id="vocab-import" class="vocab-view">
+                <div class="card" style="margin-bottom: 20px;">
+                    <h3>Đồng bộ từ máy chủ (Server)</h3>
+                    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">Tự động quét file vocab.txt gắn với server và nạp thêm các từ bạn chưa có.</p>
+                    <button class="btn btn-outline" id="btnSyncServer" onclick="loadServerVocab()">🔄 Đồng bộ từ vocab.txt</button>
+                </div>
+
                 <div class="card">
-                    <h3>Nhập từ vựng mới</h3>
+                    <h3>Nhập từ vựng mới thủ công</h3>
                     <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">Định dạng: từ | nghĩa | ví dụ (mỗi từ 1 dòng)</p>
                     
                     <div class="form-group">
@@ -779,6 +785,23 @@
                 document.getElementById('vocabData').value = '';
                 loadVocabData();
             } catch(e){}
+        }
+
+        async function loadServerVocab() {
+            try {
+                const btn = document.getElementById('btnSyncServer');
+                btn.disabled = true;
+                btn.innerText = 'Đang quét...';
+                
+                const res = await api('/vocab/load-server-file', 'POST', { user_id: state.userId });
+                showToast(`Đã đồng bộ thành công ${res.imported} từ mới!`);
+                loadVocabData();
+                btn.innerText = '🔄 Đồng bộ từ vocab.txt';
+                btn.disabled = false;
+            } catch(e) {
+                document.getElementById('btnSyncServer').disabled = false;
+                document.getElementById('btnSyncServer').innerText = '🔄 Đồng bộ từ vocab.txt';
+            }
         }
 
         async function loadVocabData() {
