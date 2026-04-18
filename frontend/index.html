@@ -389,6 +389,7 @@
             
             <div class="vocab-tabs">
                 <div class="vocab-tab active" onclick="switchVocabTab('import')">Nhập từ</div>
+                <div class="vocab-tab" onclick="switchVocabTab('list')">Danh sách từ</div>
                 <div class="vocab-tab" onclick="switchVocabTab('flashcard')">Flashcard</div>
                 <div class="vocab-tab" onclick="switchVocabTab('fillblank')">Điền vào chỗ trống</div>
                 <div class="vocab-tab" onclick="switchVocabTab('stats')">Thống kê</div>
@@ -422,7 +423,34 @@
                 </div>
             </div>
 
+            <!-- TAB: DANH SÁCH TỪ -->
+            <div id="vocab-list" class="vocab-view hidden">
+                <div class="card">
+                    <h3>Danh sách từ vựng (<span id="vocabTotalCount">0</span>)</h3>
+                    <div style="margin-top: 16px; overflow-y: auto; max-height: 500px; padding-right: 10px;">
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid #334155; color: var(--text-muted);">
+                                    <th style="padding: 12px 10px;">Từ vựng</th>
+                                    <th style="padding: 12px 10px;">Nghĩa</th>
+                                    <th style="padding: 12px 10px;">Chủ đề</th>
+                                    <th style="padding: 12px 10px;">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vocabListBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div id="vocab-flashcard" class="vocab-view hidden">
+                <div class="form-group" style="max-width: 300px; margin: 0 auto 20px;">
+                    <select id="fcTopicSelect" class="form-control" onchange="initFlashcards()">
+                        <option value="ALL">-- Tất cả các chủ đề --</option>
+                    </select>
+                </div>
                 <div id="flashcardSection" style="display:none; text-align: center;">
                     <p style="margin-bottom: 20px; color: var(--text-muted);">Thẻ <span id="fcCurrent">1</span> / <span id="fcTotal">10</span></p>
                     <div class="flashcard-container" onclick="flipCard()">
@@ -773,6 +801,7 @@
             
             if(tab === 'flashcard') initFlashcards();
             if(tab === 'stats') loadVocabStats();
+            if(tab === 'list') renderVocabList();
         }
 
         async function importVocab() {
@@ -805,33 +834,92 @@
                     const res = await api('/vocab/import-format', 'POST', { user_id: state.userId, content });
                     showToast(`Đã nạp thành công ${res.imported} từ mới!`);
                     loadVocabData();
-                } catch(err) {} finally {
-                    btn.disabled = false;
-                    btn.innerText = '📤 Tải lên và Nạp';
-                    fileInput.value = ''; // clear input
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        async function loadVocabData() {
-            try {
-                state.myVocabs = await api(`/vocab/${state.userId}`);
-            } catch(e){}
-        }
-
-        function initFlashcards() {
-            const unmastered = state.myVocabs.filter(v => v.status !== 'mastered');
-            if(unmastered.length === 0) {
-                document.getElementById('flashcardSection').style.display = 'none';
-                document.getElementById('flashcardEmpty').style.display = 'block';
-                return;
+            } catch(err) {} finally {
+                btn.disabled = false;
+                btn.innerText = '📤 Tải lên và Nạp';
+                fileInput.value = ''; // clear input
             }
-            document.getElementById('flashcardSection').style.display = 'block';
-            document.getElementById('flashcardEmpty').style.display = 'none';
-            state.fcIndex = 0;
-            renderFlashcard(unmastered);
+        };
+        reader.readAsText(file);
+    }
+
+    async function loadVocabData() {
+        try {
+            state.myVocabs = await api(`/vocab/${state.userId}`);
+            
+            // Populate flashcard topic selector
+            const tSel = document.getElementById('fcTopicSelect');
+            if (tSel) {
+                const currentVal = tSel.value;
+                const topics = [...new Set(state.myVocabs.map(v => v.topic || 'Không rõ'))];
+                let opts = '<option value="ALL">-- Tất cả các chủ đề --</option>';
+                topics.forEach(t => opts += `<option value="${t}">${t}</option>`);
+                tSel.innerHTML = opts;
+                if(topics.includes(currentVal) || currentVal === 'ALL') tSel.value = currentVal;
+            }
+        } catch(e){}
+    }
+
+    function renderVocabList() {
+        document.getElementById('vocabTotalCount').innerText = state.myVocabs.length;
+        const tbody = document.getElementById('vocabListBody');
+        tbody.innerHTML = '';
+        
+        if (state.myVocabs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 30px; color: var(--text-muted)">Chưa có từ vựng nào</td></tr>';
+            return;
         }
+
+        const grouped = {};
+        state.myVocabs.forEach(v => {
+            const t = v.topic || 'Không rõ';
+            if(!grouped[t]) grouped[t] = [];
+            grouped[t].push(v);
+        });
+
+        let html = '';
+        for (const [topic, items] of Object.entries(grouped)) {
+            html += `<tr><td colspan="4" style="padding: 16px 10px 8px; font-weight:bold; color: var(--accent); background-color: rgba(99, 102, 241, 0.05);">🏷️ ${topic} <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(${items.length} từ)</span></td></tr>`;
+            items.forEach(v => {
+                let badgeColor = v.status === 'mastered' ? 'var(--success)' : (v.status === 'learning' ? 'var(--warning)' : '#94A3B8');
+                let badgeText = v.status === 'mastered' ? 'Đã thuộc' : (v.status === 'learning' ? 'Đang học' : 'Mới');
+                
+                html += `
+                    <tr style="border-bottom: 1px solid rgba(51,65,85,0.3);">
+                        <td style="padding: 12px 10px; font-weight: 500; display:flex; align-items:center;">
+                            ${v.word} 
+                            <span style="margin-left:8px; cursor:pointer;" onclick="playTTS('${v.word.replace(/'/g, "\\'")}')">🔊</span>
+                        </td>
+                        <td style="padding: 12px 10px; color: var(--text-muted);">${v.meaning}</td>
+                        <td style="padding: 12px 10px; font-size: 13px;">${v.topic}</td>
+                        <td style="padding: 12px 10px;">
+                            <span style="font-size:12px; padding: 4px 8px; border-radius: 12px; border: 1px solid ${badgeColor}; color: ${badgeColor};">${badgeText}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        tbody.innerHTML = html;
+    }
+
+    function initFlashcards() {
+        const selectedTopic = document.getElementById('fcTopicSelect') ? document.getElementById('fcTopicSelect').value : 'ALL';
+        
+        let unmastered = state.myVocabs.filter(v => v.status !== 'mastered');
+        if (selectedTopic !== 'ALL') {
+            unmastered = unmastered.filter(v => (v.topic || 'Không rõ') === selectedTopic);
+        }
+
+        if(unmastered.length === 0) {
+            document.getElementById('flashcardSection').style.display = 'none';
+            document.getElementById('flashcardEmpty').style.display = 'block';
+            return;
+        }
+        document.getElementById('flashcardSection').style.display = 'block';
+        document.getElementById('flashcardEmpty').style.display = 'none';
+        state.fcIndex = 0;
+        renderFlashcard(unmastered);
+    }
 
         function renderFlashcard(list) {
             if(state.fcIndex >= list.length) {
